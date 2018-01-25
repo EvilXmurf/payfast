@@ -10,11 +10,11 @@ PagamentoDAO.prototype.atualiza = function(pagamento, callback){
   this._connection.query('UPDATE pagamentos SET status = ? WHERE id = ?', [pagamento.status, pagamento.id], callback);
 }
 
-PagamentoDAO.prototype.buscaPorId = function(callback){
+PagamentoDAO.prototype.lista = function(callback){
   this._connection.query('SELECT * FROM pagamentos', callback);
 }
 
-PagamentoDAO.prototype.lista = function(id, callback){
+PagamentoDAO.prototype.buscaPorId= function(id, callback){
   this._connection.query('SELECT * FROM pagamentos WHERE id = ?',[id], callback);
 }
 

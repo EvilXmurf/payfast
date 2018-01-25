@@ -1,7 +1,40 @@
+var logger = require('../servicos/logger.js');
+
 module.exports = function(app){
   app.get('/pagamentos', function(req, res){
     console.log('Recebida requisição de teste na porta 3000.');
     res.send('OK!');
+  });
+
+  app.get('/pagamentos/pagamento/:id', function(req, res){
+    var id = req.params.id;
+    logger.log('info', 'Consultando pagamento: ' + id);
+
+    var memcachedClient = app.servicos.memcachedClient();
+
+    memcachedClient.get('pagamento-' + id, function(error, retorno){
+      if(error || !retorno){
+        console.log('MISS - chave nao encontrado');
+
+        var connection = app.persistencia.connectionFactory();
+        var pagamentoDAO = new app.persistencia.PagamentoDAO(connection);
+
+        pagamentoDAO.buscaPorId(id, function(erro, resultado){
+          if(erro){
+            logger.log('error', 'Erro ao consultar no banco: ' + erro);
+            res.status(500).send(erro);
+            return;
+          }
+          console.log('Pagamentos encontrado: ' + JSON.stringify(resultado));
+          res.json(resultado);
+        });
+      // HIT no cache
+      } else {
+        console.log('HIT - valor: ' + JSON.stringify(retorno));
+        res.json(retorno);
+        return;
+      }
+    });
   });
 
   app.put('/pagamentos/pagamento/:id', function(req, res){
@@ -79,6 +112,12 @@ module.exports = function(app){
         console.log('Pagamento criado!');
         pagamento.id = resultado.insertId;
 
+        var memcachedClient =  app.servicos.memcachedClient();
+
+        memcachedClient.set('pagamento-' + pagamento.id, pagamento, 60000, function(error){
+          console.log('nova chave adicionada ao cache: pagamento-' + pagamento.id);
+        });
+
         if(pagamento.forma_de_pagamento == 'cartao'){
           console.log(cartao);
 
@@ -97,7 +136,7 @@ module.exports = function(app){
         } else {
           res.location('/pagamentos/pagamento/' + pagamento.id);
           res.status(201).json(hateoas(pagamento, cartao));
-          console.log("Status do ID: " + id + ", criado com sucesso (CRIADO).");
+          console.log("Status do ID: " + pagamento.id + ", criado com sucesso (CRIADO).");
         }
       }
     });
